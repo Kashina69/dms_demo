@@ -26,16 +26,24 @@ import {
   importEmployees,
 } from '../services/excelService.js';
 
-function notify(title, body) {
+function showNotification(title, body) {
   if (Notification.isSupported()) {
     new Notification({ title, body }).show();
   }
 }
 
-function sendError(event, error) {
-  event.sender.send('operation-error', {
-    message: error?.message || String(error),
-  });
+function notifySuccess(title, body) {
+  showNotification(`✓ ${title}`, body);
+}
+
+function notifyError(title, body) {
+  showNotification(`✕ ${title}`, body);
+}
+
+function sendError(event, error, title = 'Operation failed') {
+  const message = error?.message || String(error);
+  notifyError(title, message);
+  event.sender.send('operation-error', { message });
 }
 
 export function registerIpcHandlers() {
@@ -64,10 +72,10 @@ export function registerIpcHandlers() {
     try {
       const employees = await getAllEmployees();
       await exportEmployeesToFile(employees, filePath);
-      notify('Export complete', `Exported ${employees.length} employees to ${filePath}`);
+      notifySuccess('Export complete', `Exported ${employees.length} employees to ${filePath}`);
       return { ok: true, count: employees.length, filePath };
     } catch (error) {
-      sendError(event, error);
+      sendError(event, error, 'Export failed');
       throw error;
     }
   });
@@ -76,16 +84,23 @@ export function registerIpcHandlers() {
     try {
       const employees = await getAllEmployees();
       const buffer = await exportEmployeesToBuffer(employees);
+      notifySuccess('Export complete', `Exported ${employees.length} employees.`);
       return { ok: true, count: employees.length, data: buffer };
     } catch (error) {
-      sendError(event, error);
+      sendError(event, error, 'Export failed');
       throw error;
     }
   });
 
-  ipcMain.handle('download-template', async () => {
-    const buffer = await downloadTemplate();
-    return { ok: true, data: buffer };
+  ipcMain.handle('download-template', async (event) => {
+    try {
+      const buffer = await downloadTemplate();
+      notifySuccess('Template downloaded', 'Import template ready to use.');
+      return { ok: true, data: buffer };
+    } catch (error) {
+      sendError(event, error, 'Template download failed');
+      throw error;
+    }
   });
 
   ipcMain.handle('import-excel-file', async (event, filePath) => {
@@ -93,7 +108,7 @@ export function registerIpcHandlers() {
       const result = await parseImportFile(filePath);
       return result;
     } catch (error) {
-      sendError(event, error);
+      sendError(event, error, 'Import failed');
       throw error;
     }
   });
@@ -101,10 +116,10 @@ export function registerIpcHandlers() {
   ipcMain.handle('save-imported-rows', async (event, rows) => {
     try {
       const created = await importEmployees(rows);
-      notify('Import complete', `Imported ${created.length} employees successfully.`);
+      notifySuccess('Import complete', `Imported ${created.length} employees successfully.`);
       return { ok: true, count: created.length };
     } catch (error) {
-      sendError(event, error);
+      sendError(event, error, 'Import failed');
       throw error;
     }
   });
@@ -125,10 +140,10 @@ export function registerIpcHandlers() {
       const result = data.id
         ? await updateEmployee(data.id, data)
         : await createEmployee(data);
-      notify('Employee saved', `${result.name} saved successfully.`);
+      notifySuccess('Employee saved', `${result.name} saved successfully.`);
       return result;
     } catch (error) {
-      sendError(event, error);
+      sendError(event, error, 'Save failed');
       throw error;
     }
   });
@@ -136,10 +151,10 @@ export function registerIpcHandlers() {
   ipcMain.handle('delete-employee', async (event, id) => {
     try {
       const result = await deleteEmployee(id);
-      notify('Employee deleted', `Employee removed successfully.`);
+      notifySuccess('Employee deleted', `Employee removed successfully.`);
       return result;
     } catch (error) {
-      sendError(event, error);
+      sendError(event, error, 'Delete failed');
       throw error;
     }
   });
@@ -152,18 +167,20 @@ export function registerIpcHandlers() {
       const result = data.id
         ? await updateDepartment(data.id, data)
         : await createDepartment(data);
+      notifySuccess('Department saved', `${result.name} saved successfully.`);
       return result;
     } catch (error) {
-      sendError(event, error);
+      sendError(event, error, 'Save failed');
       throw error;
     }
   });
   ipcMain.handle('delete-department', async (event, id) => {
     try {
       const result = await deleteDepartment(id);
+      notifySuccess('Department deleted', 'Department removed successfully.');
       return result;
     } catch (error) {
-      sendError(event, error);
+      sendError(event, error, 'Delete failed');
       throw error;
     }
   });
@@ -183,10 +200,10 @@ export function registerIpcHandlers() {
   ipcMain.handle('update-salary', async (event, { employeeId, salary }) => {
     try {
       const applied = await updateEmployeeSalary(employeeId, salary);
-      notify('Salary updated', `New salary ${applied} applied.`);
+      notifySuccess('Salary updated', `New salary ${applied} applied.`);
       return { ok: true, applied };
     } catch (error) {
-      sendError(event, error);
+      sendError(event, error, 'Salary update failed');
       throw error;
     }
   });
@@ -194,10 +211,10 @@ export function registerIpcHandlers() {
   ipcMain.handle('bulk-update-salary', async (event, { deptId, percent }) => {
     try {
       const updatedCount = await bulkUpdateEmployeeSalaries(deptId ?? null, percent);
-      notify('Bulk salary update', `Updated ${updatedCount} employee salaries.`);
+      notifySuccess('Bulk salary update', `Updated ${updatedCount} employee salaries.`);
       return { ok: true, updatedCount };
     } catch (error) {
-      sendError(event, error);
+      sendError(event, error, 'Bulk salary update failed');
       throw error;
     }
   });
@@ -205,10 +222,10 @@ export function registerIpcHandlers() {
   ipcMain.handle('transfer-employee', async (event, { employeeId, newDeptId }) => {
     try {
       await transferEmployee(employeeId, newDeptId);
-      notify('Employee transferred', 'Transfer completed and logged.');
+      notifySuccess('Employee transferred', 'Transfer completed and logged.');
       return { ok: true };
     } catch (error) {
-      sendError(event, error);
+      sendError(event, error, 'Transfer failed');
       throw error;
     }
   });
@@ -219,7 +236,7 @@ export function registerIpcHandlers() {
 
   // ---------- System ----------
   ipcMain.handle('show-notification', (_event, { title, body }) => {
-    notify(title || 'Notification', body || '');
+    notifySuccess(title || 'Notification', body || '');
     return true;
   });
 }

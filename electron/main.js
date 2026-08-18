@@ -6,6 +6,8 @@ import { registerIpcHandlers } from './ipc.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+app.setAppUserModelId('com.empdata.manager');
+
 let mainWindow = null;
 
 async function connectDb() {
