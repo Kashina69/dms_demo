@@ -1,0 +1,35 @@
+{
+  "name": "empdata-manager",
+  "version": "1.0.0",
+  "description": "EmpData Manager - Employee data management desktop app (Electron + React + Sequelize + PostgreSQL)",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "vite",
+    "build:web": "vite build",
+    "build": "npm run build:web && electron-builder",
+    "db:migrate": "sequelize-cli db:migrate",
+    "db:seed": "sequelize-cli db:seed:all",
+    "db:procs": "node scripts/create-procedures.js",
+    "db:setup": "npm run db:migrate && npm run db:seed && npm run db:procs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
+    "pg": "^8.23.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "sequelize": "^6.37.8"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.5",
+    "electron": "^43.4.0",
+    "sequelize-cli": "^6.6.5",
+    "vite": "^8.2.1"
+  }
+}
