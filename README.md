@@ -13,7 +13,8 @@ Implements the [PRD](PRD.md): employee CRUD, department management, stored proce
 - **Dashboard** — total employees, departments, average salary, recent hires
 - **Employees** — add / edit / delete / search / filter by department
 - **Salary updates** — via the `UpdateEmployeeSalary` stored procedure (rejects decreases > 50%)
-- **Transfers** — move employees between departments via the `TransferEmployee` stored procedure; moves are logged in `transfer_log`
+- **Bulk salary updates** — via the `BulkUpdateEmployeeSalaries` stored procedure (percentage change to a department or all employees, same 50% guard)
+- **Transfers** — move employees between departments via the `TransferEmployee` stored procedure; moves are logged in `transfer_log` (also modeled as `TransferLog` in Sequelize)
 - **Departments** — create, delete (only when empty), live employee counts, and stats (avg salary, totals) computed by the `GetDepartmentStats` stored procedure
 - **Excel** — export via native save dialog, download import template, import with full validation and preview before saving
 - **System** — native file dialogs, desktop notifications, reveal-in-folder after export
@@ -98,9 +99,10 @@ Defined in [`db/procedures/create_stored_procedures.sql`](db/procedures/create_s
 | Procedure | Signature | Behavior |
 |-----------|-----------|----------|
 | `GetEmployeesByDepartment` | `(p_dept_id INT)` → table | Employee list (with department name) for a department |
-| `GetDepartmentStats` | `(p_dept_id INT)` → `(total_employees, avg_salary)` | Aggregates per department |
+| `GetDepartmentStats` | `(p_dept_id INT)` → `(totalEmployees, avgSalary)` | Aggregates per department |
 | `UpdateEmployeeSalary` | `(INOUT p_new_salary DECIMAL, IN p_employee_id INT)` | Validates: salary cannot decrease by more than 50%; returns the applied salary |
 | `TransferEmployee` | `(IN p_employee_id INT, IN p_new_dept_id INT)` | Moves employee and inserts a `transfer_log` row |
+| `BulkUpdateEmployeeSalaries` | `(p_dept_id INT, p_percent NUMERIC)` → count | Applies a percentage change to a department (or all); enforces the 50% decrease guard |
 | `GetTransferLog` | `(p_employee_id INT)` → table | Transfer history |
 
 ## Database Schema
@@ -112,7 +114,9 @@ employees:    id (PK), name, email (UNIQUE), department_id (FK → departments.i
 transfer_log: id (PK), employee_id (FK → employees.id), from_department_id, to_department_id, transferred_at
 ```
 
-Relations: `Department.hasMany(Employee)` / `Employee.belongsTo(Department)` (see `models/index.js`).
+Relations: `Department.hasMany(Employee)` / `Employee.belongsTo(Department)` / `TransferLog.belongsTo(Employee)` (see `models/index.js`).
+
+Stored procedure result columns are aliased **camelCase** to match Sequelize attribute names (e.g. `GetDepartmentStats` returns `totalEmployees`/`avgSalary`); both the `RETURNS TABLE` column names and select aliases must be double-quoted in the SQL.
 
 ## Excel Format
 
@@ -144,6 +148,7 @@ Sample files are in [`sample-data/`](sample-data/):
 | `get-departments` / `save-department` / `delete-department` | renderer → main | Department CRUD |
 | `get-department-stats` / `get-department-detail` | renderer → main | Stats (stored proc) |
 | `update-salary` / `transfer-employee` | renderer → main | Stored procedures |
+| `bulk-update-salary` | renderer → main | Bulk salary update (stored proc) |
 | `show-notification` | renderer → main | Desktop notification |
 | `operation-error` | main → renderer | Error broadcast |
 
@@ -153,7 +158,7 @@ The preload script (`electron/preload.cjs`) exposes these safely via `contextBri
 
 ```
 config/            sequelize-cli config (database.cjs)
-models/            sequelize.js (instance), department.js, employee.js, index.js (associations)
+models/            sequelize.js (instance), department.js, employee.js, transfer_log.js, index.js (associations)
 db/migrations/     schema migrations (departments, employees, transfer_log)
 db/seeders/        sample data
 db/procedures/     stored procedure SQL

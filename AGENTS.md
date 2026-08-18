@@ -26,14 +26,15 @@ Verification (no lint/test runner exists):
 
 ## Stored procedures
 
-- Source of truth: `db/procedures/create_stored_procedures.sql` (PL/pgSQL, re-runnable).
+- Source of truth: `db/procedures/create_stored_procedures.sql` (PL/pgSQL, re-runnable; drops objects first because `CREATE OR REPLACE` cannot change a return type).
 - Called via raw `sequelize.query` in `services/storedProcService.js`: functions with `SELECT * FROM "Name"(...)`, procedures with `CALL "Name"(...)`.
-- `TransferEmployee` writes to `transfer_log` (created by migration `003`, not in the PRD's original schema).
+- `TransferEmployee` writes to `transfer_log` (created by migration `003`, not in the PRD's original schema). A `TransferLog` model exists (`models/transfer_log.js`) for ORM reads, but the stored procedures are the only write path.
 - Tables use camelCase `"createdAt"`/`"updatedAt"` columns — SQL that references them must quote the identifiers.
+- **Result columns are aliased camelCase** to match Sequelize attribute names (e.g. `GetDepartmentStats` returns `totalEmployees`/`avgSalary`, `GetEmployeesByDepartment` returns `departmentId`/`joinDate`). Both the `RETURNS TABLE` column names AND the select aliases must be double-quoted — unquoted identifiers fold to lowercase in PostgreSQL.
+- `BulkUpdateEmployeeSalaries(dept_id, percent)` applies a percentage change to all employees in a department (or all when `dept_id` is NULL), enforcing the same 50% decrease guard.
 
 ## Gotchas
 
 - **Schema permission:** on PostgreSQL 15+, the app role needs `GRANT ALL ON SCHEMA public TO empdata_app;` or migrations fail with `permission denied for schema public`.
-- **Declare DECIMAL returns explicitly:** stored proc columns like `salary`/`avg_salary` come back as strings via Sequelize raw queries; the UI handles them with `Number(...)`.
-- **Sequelize DECIMAL fields** also arrive as strings from model queries — normalize before display/export.
+- **Stored proc numeric columns** (BIGINT/NUMERIC like `totalEmployees`/`avgSalary`/`salary`) come back as strings via raw queries; the UI normalizes with `Number(...)`. Sequelize DECIMAL model fields behave the same.
 - Sample Excel files live in `sample-data/`; regenerate with `node scripts/create-sample-excel.js` (gitignored).
