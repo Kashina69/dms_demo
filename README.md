@@ -92,6 +92,27 @@ VITE_DEV_SERVER_URL=http://localhost:5173 npx electron .
 
 ---
 
+On the new Linux box, after npm install, do this:
+1. Start Postgres and create the DB + role (as the postgres superuser):
+sudo systemctl start postgresql
+sudo -u postgres psql <<'SQL'
+CREATE DATABASE empdata_manager;
+CREATE ROLE empdata_app WITH LOGIN PASSWORD 'empdata_app';
+GRANT ALL PRIVILEGES ON DATABASE empdata_manager TO empdata_app;
+SQL
+sudo -u postgres psql -d empdata_manager -c 'GRANT ALL ON SCHEMA public TO empdata_app;'
+The last line matters on PG 15+ — without it migrations fail with permission denied for schema public.
+2. Config: create .env from the example (it's gitignored, so you must make it):
+cp .env.example .env
+Adjust DB_HOST/DB_PASSWORD if your Postgres uses a different auth (e.g. peer auth for local — if so, use 127.0.0.1 + password auth).
+3. Init the schema, then build and run:
+npm run db:setup    # migrations + seeders + stored procedures
+npm run build:web
+npm start
+For hot-reload dev: npm run dev in one terminal, then VITE_DEV_SERVER_URL=http://localhost:5173 npx electron . in another.
+The only Linux-specific gotchas vs Windows: the postgres service name (postgresql vs postgresql-x64-18) and using sudo -u postgres psql. Everything else is identical to what the README describes.
+
+
 ## Stored Procedures
 
 Defined in [`db/procedures/create_stored_procedures.sql`](db/procedures/create_stored_procedures.sql) and re-created idempotently by `npm run db:procs`.
