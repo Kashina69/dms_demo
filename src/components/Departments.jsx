@@ -33,11 +33,11 @@ function DepartmentDetail({ deptId, onClose }) {
           <>
             <div className="stat-grid small">
               <div className="stat-card">
-                <div className="stat-value">{detail.total_employees}</div>
+                <div className="stat-value">{detail.totalEmployees}</div>
                 <div className="stat-label">Employees (stored proc)</div>
               </div>
               <div className="stat-card">
-                <div className="stat-value">{formatCurrency(detail.avg_salary)}</div>
+                <div className="stat-value">{formatCurrency(detail.avgSalary)}</div>
                 <div className="stat-label">Average Salary (stored proc)</div>
               </div>
               <div className="stat-card">
@@ -65,7 +65,7 @@ function DepartmentDetail({ deptId, onClose }) {
                     <td className="strong">{e.name}</td>
                     <td>{e.email}</td>
                     <td>{formatCurrency(e.salary)}</td>
-                    <td>{formatDate(e.join_date)}</td>
+                    <td>{formatDate(e.joinDate)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -166,7 +166,7 @@ export default function Departments({ pushToast }) {
                 <div className="stat-label">Employees</div>
               </div>
               <div>
-                <div className="stat-value">{formatCurrency(d.avg_salary)}</div>
+                <div className="stat-value">{formatCurrency(d.avgSalary)}</div>
                 <div className="stat-label">Avg Salary</div>
               </div>
             </div>

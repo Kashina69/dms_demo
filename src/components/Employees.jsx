@@ -97,6 +97,81 @@ function TransferModal({ employee, departments, onClose, onDone }) {
   );
 }
 
+function BulkSalaryModal({ departments, defaultDeptId, onClose, onApplied }) {
+  const [deptId, setDeptId] = useState(defaultDeptId ? String(defaultDeptId) : '');
+  const [percent, setPercent] = useState('10');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const targetName = deptId
+    ? departments.find((d) => d.id === Number(deptId))?.name
+    : 'all departments';
+
+  async function submit(e) {
+    e.preventDefault();
+    setError('');
+    const pct = Number(percent);
+    if (percent === '' || Number.isNaN(pct)) return setError('Enter a percentage');
+    if (pct < -50) return setError('Decreases over 50% are not allowed');
+    setBusy(true);
+    try {
+      const res = await api.bulkUpdateSalary(deptId ? Number(deptId) : null, pct);
+      onApplied(res.updatedCount, pct, targetName);
+      onClose();
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <h2>Bulk Salary Update</h2>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <form onSubmit={submit}>
+          <p className="hint">
+            Runs stored procedure <code>BulkUpdateEmployeeSalaries</code>. Applies the same percentage to every
+            employee in the selected department; decreases over 50% are rejected.
+          </p>
+          <div className="form-grid">
+            <label className="full">
+              Department
+              <select value={deptId} onChange={(e) => setDeptId(e.target.value)}>
+                <option value="">— All departments —</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Percentage change
+              <input
+                type="number"
+                step="0.01"
+                min="-50"
+                value={percent}
+                onChange={(e) => setPercent(e.target.value)}
+                placeholder="e.g. 10 for a 10% raise"
+                autoFocus
+              />
+            </label>
+          </div>
+          {error && <div className="form-error">{error}</div>}
+          <div className="modal-actions">
+            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={busy}>
+              {busy ? 'Applying…' : `Apply ${percent}% to ${targetName}`}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function Employees({ pushToast }) {
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -106,6 +181,7 @@ export default function Employees({ pushToast }) {
   const [formState, setFormState] = useState(null); // {mode:'add'|'edit', employee?}
   const [salaryEmployee, setSalaryEmployee] = useState(null);
   const [transferEmployee, setTransferEmployee] = useState(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -210,6 +286,7 @@ export default function Employees({ pushToast }) {
         <div className="spacer" />
         <button className="btn btn-ghost" onClick={handleExportDownload}>Download Excel</button>
         <button className="btn btn-outline" onClick={handleExport}>Export to File…</button>
+        <button className="btn btn-outline" onClick={() => setBulkOpen(true)}>Bulk Salary Update</button>
         <button className="btn btn-primary" onClick={() => setFormState({ mode: 'add' })}>+ Add Employee</button>
       </div>
 
@@ -275,6 +352,16 @@ export default function Employees({ pushToast }) {
           departments={departments}
           onDone={() => pushToast('success', `${transferEmployee.name} transferred.`)}
           onClose={() => setTransferEmployee(null)}
+        />
+      )}
+      {bulkOpen && (
+        <BulkSalaryModal
+          departments={departments}
+          defaultDeptId={deptFilter || null}
+          onApplied={(updatedCount, pct, targetName) =>
+            pushToast('success', `Bulk update: ${pct}% applied to ${updatedCount} employee(s) in ${targetName}.`)
+          }
+          onClose={() => setBulkOpen(false)}
         />
       )}
     </div>
