@@ -1,8 +1,8 @@
-import { sequelize } from '../models/index.js';
+import { sequelize, TransferLog } from '../models/index.js';
 import { getAllEmployees, getDashboardStats, createEmployee, updateEmployee, deleteEmployee, transferEmployee, updateEmployeeSalary } from '../services/employeeService.js';
 import { getAllDepartments, getDepartmentDetail } from '../services/departmentService.js';
 import { exportEmployeesToBuffer, downloadTemplate, parseImportFile, importEmployees } from '../services/excelService.js';
-import { getTransferLog } from '../services/storedProcService.js';
+import { getTransferLog, bulkUpdateEmployeeSalaries } from '../services/storedProcService.js';
 
 async function main() {
   await sequelize.authenticate();
@@ -12,7 +12,7 @@ async function main() {
   console.log('[ok] departments:', deps.map((d) => `${d.name}(${d.employeeCount})`).join(', '));
 
   const detail = await getDepartmentDetail(1);
-  console.log('[ok] dept 1 detail:', JSON.stringify({ total: detail.total_employees, avg: detail.avg_salary, empCount: detail.employees.length }));
+  console.log('[ok] dept 1 detail:', JSON.stringify({ total: detail.totalEmployees, avg: detail.avgSalary, empCount: detail.employees.length }));
 
   const emps = await getAllEmployees();
   console.log('[ok] employees:', emps.length);
@@ -31,12 +31,31 @@ async function main() {
   const log = await getTransferLog(newEmp.id);
   console.log('[ok] transfer log entries:', log.length);
 
+  const logModelCount = await TransferLog.count({ where: { employeeId: newEmp.id } });
+  console.log('[ok] TransferLog model entries:', logModelCount);
+  if (logModelCount !== log.length) throw new Error('TransferLog model count mismatch');
+
   try {
     await updateEmployeeSalary(newEmp.id, 100);
     console.log('[FAIL] salary validation did not trigger');
   } catch (e) {
     console.log('[ok] salary validation blocked decrease:', e.message);
   }
+
+  const bulkBefore = await getAllEmployees().then((all) =>
+    all.filter((e) => e.departmentId === 2).map((e) => ({ id: e.id, salary: e.salary }))
+  );
+  const bulkCount = await bulkUpdateEmployeeSalaries(2, 10);
+  console.log('[ok] bulk salary +10% in dept 2 updated:', bulkCount);
+  const bulkBlocked = await bulkUpdateEmployeeSalaries(2, -60).catch((e) => e.message);
+  console.log('[ok] bulk decrease over 50% blocked:', bulkBlocked);
+  if (!String(bulkBlocked).includes('50%')) throw new Error('Bulk decrease guard did not trigger');
+  for (const row of bulkBefore) {
+    await sequelize.query('UPDATE employees SET salary = :salary, "updatedAt" = NOW() WHERE id = :id', {
+      replacements: { salary: row.salary, id: row.id },
+    });
+  }
+  console.log('[ok] restored dept 2 salaries');
 
   const buf = await exportEmployeesToBuffer(emps);
   console.log('[ok] exported buffer bytes:', buf.length);

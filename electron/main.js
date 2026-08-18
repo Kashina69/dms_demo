@@ -68,6 +68,10 @@ function createWindow() {
           )}).then(r => JSON.stringify({ valid: r.validRows.length, errors: r.errorRows.length }))`
         );
         console.log('[smoke] import parse IPC ok:', parsed);
+        const bulk = await mainWindow.webContents.executeJavaScript(
+          `window.api.bulkUpdateSalary(null, 0).then(r => JSON.stringify({ ok: r.ok, updated: r.updatedCount }))`
+        );
+        console.log('[smoke] bulk salary IPC ok:', bulk);
         console.log('[smoke] renderer loaded OK');
       } catch (error) {
         console.error('[smoke] FAILED:', error.message);
