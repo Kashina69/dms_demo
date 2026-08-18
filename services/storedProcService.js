@@ -13,7 +13,15 @@ export async function getDepartmentStats(deptId) {
     `SELECT * FROM "GetDepartmentStats"(:deptId)`,
     { replacements: { deptId } }
   );
-  return rows[0] || { total_employees: 0, avg_salary: 0 };
+  return rows[0] || { totalEmployees: 0, avgSalary: 0 };
+}
+
+export async function bulkUpdateEmployeeSalaries(deptId = null, percent) {
+  const [rows] = await sequelize.query(
+    `SELECT "BulkUpdateEmployeeSalaries"(:deptId, :percent) AS "updatedCount"`,
+    { replacements: { deptId, percent } }
+  );
+  return Number(rows?.[0]?.updatedCount ?? 0);
 }
 
 export async function updateEmployeeSalary(employeeId, newSalary) {
