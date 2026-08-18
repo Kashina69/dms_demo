@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('api', {
   getDepartmentStats: (deptId) => ipcRenderer.invoke('get-department-stats', deptId),
   updateSalary: (employeeId, salary) =>
     ipcRenderer.invoke('update-salary', { employeeId, salary }),
+  bulkUpdateSalary: (deptId, percent) =>
+    ipcRenderer.invoke('bulk-update-salary', { deptId, percent }),
   transferEmployee: (employeeId, newDeptId) =>
     ipcRenderer.invoke('transfer-employee', { employeeId, newDeptId }),
   getTransferLog: (employeeId) => ipcRenderer.invoke('get-transfer-log', employeeId),

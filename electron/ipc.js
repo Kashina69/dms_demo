@@ -17,7 +17,7 @@ import {
   deleteDepartment,
   getDepartmentDetail,
 } from '../services/departmentService.js';
-import { getTransferLog } from '../services/storedProcService.js';
+import { getTransferLog, bulkUpdateEmployeeSalaries } from '../services/storedProcService.js';
 import {
   exportEmployeesToFile,
   exportEmployeesToBuffer,
@@ -174,8 +174,8 @@ export function registerIpcHandlers() {
   ipcMain.handle('get-department-stats', async (_event, deptId) => {
     const detail = await getDepartmentDetail(deptId);
     return {
-      total_employees: detail.total_employees,
-      avg_salary: detail.avg_salary,
+      totalEmployees: detail.totalEmployees,
+      avgSalary: detail.avgSalary,
       employees: detail.employees,
     };
   });
@@ -185,6 +185,17 @@ export function registerIpcHandlers() {
       const applied = await updateEmployeeSalary(employeeId, salary);
       notify('Salary updated', `New salary ${applied} applied.`);
       return { ok: true, applied };
+    } catch (error) {
+      sendError(event, error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('bulk-update-salary', async (event, { deptId, percent }) => {
+    try {
+      const updatedCount = await bulkUpdateEmployeeSalaries(deptId ?? null, percent);
+      notify('Bulk salary update', `Updated ${updatedCount} employee salaries.`);
+      return { ok: true, updatedCount };
     } catch (error) {
       sendError(event, error);
       throw error;
